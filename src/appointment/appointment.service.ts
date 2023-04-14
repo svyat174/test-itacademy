@@ -17,7 +17,7 @@ export class AppointmentService {
     });
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_3_HOURS)
   async handleLongNotify() {
     console.log('handleLongNotify');
     const now = new Date();
@@ -46,7 +46,7 @@ export class AppointmentService {
     });
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async handleShortNotify() {
     console.log('handleShortNotify');
     const now = new Date();
@@ -76,12 +76,27 @@ export class AppointmentService {
   }
 
   private sendAppiontmentNotify(appoinments: Appoinments[]) {
+    const now = new Date();
+    const laterTime = new Date(now.getTime() + 90 * 60 * 1000);
+
     for (const appointment of appoinments) {
-      console.log(`
+      if (appointment.date < laterTime) {
+        console.log(`
         Уважаемый ${appointment.name}!
-        Напоминаем, что у вас запись на прием к врачу ${appointment.doctorName} завтра в ${appointment.date}
+        Напоминаем, что у вас запись на прием к врачу ${
+          appointment.doctorName
+        } сегодня в ${appointment.date.getTime()}
         Адрес клиники: ${appointment.clinicAddress}
       `);
+      } else {
+        console.log(`
+        Уважаемый ${appointment.name}!
+        Напоминаем, что у вас запись на прием к врачу ${
+          appointment.doctorName
+        } завтра ${appointment.date.getDay()} в ${appointment.date.getTime()}
+        Адрес клиники: ${appointment.clinicAddress}
+      `);
+      }
     }
   }
 }
