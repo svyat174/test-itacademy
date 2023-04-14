@@ -11,13 +11,12 @@ export class AppointmentService {
   async createAppointment(
     createAppointmentDto: CreateAppointmentDto,
   ): Promise<Appoinments> {
-    console.log('createAppointmentDto', createAppointmentDto);
     return await this.prisma.appoinments.create({
       data: createAppointmentDto,
     });
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_3_HOURS)
   async handleLongNotify() {
     const now = new Date();
     const checkDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -45,7 +44,7 @@ export class AppointmentService {
     });
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async handleShortNotify() {
     const now = new Date();
     const checkDate = new Date(now.getTime() + 90 * 60 * 1000);
@@ -79,44 +78,25 @@ export class AppointmentService {
     for (const appointment of appointments) {
       const timeDiff = appointment.date.getTime() - now.getTime();
 
-      if (timeDiff <= 0) {
-        console.log(`
-          Уважаемый ${appointment.name}!
-          Вы пропустили свой прием к врачу ${
-            appointment.doctorName
-          } на ${Math.abs(Math.round(timeDiff / (60 * 1000)))} минут
-          Адрес клиники: ${appointment.clinicAddress}
-        `);
-      } else if (timeDiff <= 90 * 60 * 1000) {
-        const remindTime = new Date(now.getTime() + 90 * 60 * 1000);
+      if (timeDiff <= 90 * 60 * 1000) {
         console.log(`
           Уважаемый ${appointment.name}!
           Напоминаем, что у вас запись на прием к врачу ${
             appointment.doctorName
           } через ${Math.round(timeDiff / (60 * 1000))} минут 
-          (${remindTime.getHours()}:${remindTime.getMinutes()})
+          (${appointment.date.getHours()}:${appointment.date.getMinutes()})
           Адрес клиники: ${appointment.clinicAddress}
         `);
-      } else if (timeDiff <= 24 * 60 * 60 * 1000) {
+      } else if (
+        timeDiff <= 24 * 60 * 60 * 1000 &&
+        timeDiff >= 90 * 60 * 1000 &&
+        appointment.date.getDay() !== now.getDay()
+      ) {
         console.log(`
           Уважаемый ${appointment.name}!
           Напоминаем, что у вас запись на прием к врачу ${
             appointment.doctorName
-          } завтра ${appointment.date.getDay()} в ${appointment.date.getHours()}:${appointment.date.getMinutes()}
-          Адрес клиники: ${appointment.clinicAddress}
-        `);
-      } else {
-        const remindTime = new Date(
-          appointment.date.getTime() - 24 * 60 * 60 * 1000,
-        );
-        console.log(`
-          Уважаемый ${appointment.name}!
-          Напоминаем, что у вас запись на прием к врачу ${
-            appointment.doctorName
-          } через ${Math.round(timeDiff / (24 * 60 * 60 * 1000))} дней 
-          (${remindTime.getDate()}.${
-          remindTime.getMonth() + 1
-        }.${remindTime.getFullYear()})
+          } завтра ${appointment.date.getDay()}.${appointment.date.getMonth()} в ${appointment.date.getHours()}:${appointment.date.getMinutes()}
           Адрес клиники: ${appointment.clinicAddress}
         `);
       }
