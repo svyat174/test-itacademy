@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { Appoinments } from '@prisma/client';
 import { PrismaService } from 'src/prisma.service';
 import { CreateAppointmentDto } from './dto/create-appointments.dto';
@@ -11,65 +11,92 @@ export class AppointmentService {
   async createAppointment(
     createAppointmentDto: CreateAppointmentDto,
   ): Promise<Appoinments> {
-    return await this.prisma.appoinments.create({
-      data: createAppointmentDto,
-    });
+    try {
+      const now = new Date();
+
+      if (createAppointmentDto.date.getTime() < now.getTime()) {
+        throw new Error('Нельзя записаться на прошедшую дату');
+      }
+
+      if (createAppointmentDto.date.getDay() === now.getDay()) {
+        return await this.prisma.appoinments.create({
+          data: {
+            ...createAppointmentDto,
+            longNotify: true,
+          },
+        });
+      }
+
+      return await this.prisma.appoinments.create({
+        data: createAppointmentDto,
+      });
+    } catch (error) {
+      throw new HttpException(error.message, 400);
+    }
   }
 
-  @Cron(CronExpression.EVERY_3_HOURS)
+  @Cron(CronExpression.EVERY_5_SECONDS)
   async handleLongNotify() {
-    const now = new Date();
-    const checkDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    try {
+      const now = new Date();
+      const checkDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    const appointments = await this.prisma.appoinments.findMany({
-      where: {
-        date: {
-          lte: checkDate,
+      const appointments = await this.prisma.appoinments.findMany({
+        where: {
+          date: {
+            lte: checkDate,
+          },
+          longNotify: false,
         },
-        longNotify: false,
-      },
-    });
+      });
 
-    this.sendAppiontmentNotify(appointments);
+      this.sendAppiontmentNotify(appointments);
 
-    await this.prisma.appoinments.updateMany({
-      where: {
-        id: {
-          in: appointments.map((a) => a.id),
+      await this.prisma.appoinments.updateMany({
+        where: {
+          id: {
+            in: appointments.map((a) => a.id),
+          },
         },
-      },
-      data: {
-        longNotify: true,
-      },
-    });
+        data: {
+          longNotify: true,
+        },
+      });
+    } catch (error) {
+      throw new HttpException(error.message, 400);
+    }
   }
 
-  @Cron(CronExpression.EVERY_10_MINUTES)
+  @Cron(CronExpression.EVERY_5_SECONDS)
   async handleShortNotify() {
-    const now = new Date();
-    const checkDate = new Date(now.getTime() + 90 * 60 * 1000);
+    try {
+      const now = new Date();
+      const checkDate = new Date(now.getTime() + 90 * 60 * 1000);
 
-    const appointments = await this.prisma.appoinments.findMany({
-      where: {
-        date: {
-          lte: checkDate,
+      const appointments = await this.prisma.appoinments.findMany({
+        where: {
+          date: {
+            lte: checkDate,
+          },
+          shortNotify: false,
         },
-        shortNotify: false,
-      },
-    });
+      });
 
-    this.sendAppiontmentNotify(appointments);
+      this.sendAppiontmentNotify(appointments);
 
-    await this.prisma.appoinments.updateMany({
-      where: {
-        id: {
-          in: appointments.map((a) => a.id),
+      await this.prisma.appoinments.updateMany({
+        where: {
+          id: {
+            in: appointments.map((a) => a.id),
+          },
         },
-      },
-      data: {
-        shortNotify: true,
-      },
-    });
+        data: {
+          shortNotify: true,
+        },
+      });
+    } catch (error) {
+      throw new HttpException(error.message, 400);
+    }
   }
 
   private sendAppiontmentNotify(appointments: Appoinments[]) {
@@ -84,7 +111,10 @@ export class AppointmentService {
           Напоминаем, что у вас запись на прием к врачу ${
             appointment.doctorName
           } через ${Math.round(timeDiff / (60 * 1000))} минут 
-          (${appointment.date.getHours()}:${appointment.date.getMinutes()})
+          (${appointment.date
+            .toLocaleTimeString('ru-RU', { hour12: false })
+            .replace(/^0/, '')
+            .slice(0, -3)})
           Адрес клиники: ${appointment.clinicAddress}
         `);
       } else if (
@@ -96,7 +126,10 @@ export class AppointmentService {
           Уважаемый ${appointment.name}!
           Напоминаем, что у вас запись на прием к врачу ${
             appointment.doctorName
-          } завтра ${appointment.date.getDay()}.${appointment.date.getMonth()} в ${appointment.date.getHours()}:${appointment.date.getMinutes()}
+          } завтра в ${appointment.date
+          .toLocaleTimeString('ru-RU', { hour12: false })
+          .replace(/^0/, '')
+          .slice(0, -3)}
           Адрес клиники: ${appointment.clinicAddress}
         `);
       }
