@@ -35,7 +35,7 @@ export class AppointmentService {
     }
   }
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  @Cron(CronExpression.EVERY_3_HOURS)
   async handleLongNotify() {
     try {
       const now = new Date();
@@ -67,7 +67,7 @@ export class AppointmentService {
     }
   }
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async handleShortNotify() {
     try {
       const now = new Date();
